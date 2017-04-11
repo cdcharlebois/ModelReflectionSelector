@@ -40,6 +40,13 @@ define([
         },
 
         update: function(obj, callback) {
+            mx.data.get({
+                xpath: "//MxModelReflection.MxObjectType",
+                callback: function(objs) {
+                    console.log("Received " + objs.length + " MxObjects");
+                    this._renderCheckboxes(objs);
+                }
+            }, this);
             logger.debug(this.id + ".update");
 
             this._contextObj = obj;
@@ -54,14 +61,20 @@ define([
             logger.debug(this.id + ".uninitialize");
         },
 
+        _renderCheckboxes: function(objects) {
+            objects.forEach(lang.hitch(this, function(obj) {
+                this.domNode.innerHTML += '    ' + obj.get('Name');
+            }))
+        },
+
         _updateRendering: function(callback) {
             logger.debug(this.id + "._updateRendering");
 
-            if (this._contextObj !== null) {
-                dojoStyle.set(this.domNode, "display", "block");
-            } else {
-                dojoStyle.set(this.domNode, "display", "none");
-            }
+            // if (this._contextObj !== null) {
+            //     dojoStyle.set(this.domNode, "display", "block");
+            // } else {
+            //     dojoStyle.set(this.domNode, "display", "none");
+            // }
 
             this._executeCallback(callback);
         },
