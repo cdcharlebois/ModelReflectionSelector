@@ -35,6 +35,7 @@ define([
         _contextObj: null,
         _entities: null,
         _associations: null,
+        _members: null,
 
         constructor: function() {
             this._handles = [];
@@ -64,8 +65,19 @@ define([
                             // this._rfxObjects = objs;
                             // this._renderCheckboxes(objs);
                             this._associations = objs; // set associations...
-                            this._contextObj = obj;
-                            this._updateRendering(callback);
+                            mx.data.get({
+                                // xpath: "//MxModelReflection.MxObjectType",
+                                xpath: "//MxModelReflection.MxObjectMember",
+                                callback: lang.hitch(this, function(objs) {
+                                    console.log("Received " + objs.length + " MxObjects");
+                                    // this._rfxObjects = objs;
+                                    // this._renderCheckboxes(objs);
+                                    this._members = objs; // set members...
+
+                                    this._contextObj = obj;
+                                    this._updateRendering(callback);
+                                })
+                            }, this);
                         })
                     }, this);
                 })
@@ -84,7 +96,7 @@ define([
             logger.debug(this.id + ".uninitialize");
         },
 
-        _getChildrenNodesForParent: function(parent) {
+        _getChildrenNodesForParentObject: function(parent) {
             var ret = [];
             // given a parent ID
             var pid = parent.getGuid();
@@ -92,17 +104,23 @@ define([
             this._associations.forEach(function(a) {
                 if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0] === pid ||
                     a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0] === pid) {
-                    ret.push(a);
+                    ret.push({
+                        text: a.get('Name'),
+                        type: 'assc'
+                    });
                 }
             });
-            return ret.map(function(association) {
-                    return {
-                        text: association.get('Name'),
-                        type: 'assc'
-                    }
-                })
-                // .get("MxModelReflection.MxObjectReference_MxObjectType_Parent")
-                // .get("MxModelReflection.MxObjectReference_MxObjectType_Child")
+            this._members.forEach(function(a) {
+                if (a.get("MxModelReflection.MxObjectMember_MxObjectType") === pid) {
+                    ret.push({
+                        text: a.get('AttributeName'),
+                        type: 'attr'
+                    });
+                }
+            });
+            return ret;
+            // .get("MxModelReflection.MxObjectReference_MxObjectType_Parent")
+            // .get("MxModelReflection.MxObjectReference_MxObjectType_Child")
         },
 
         _renderCheckboxes: function() {
@@ -111,7 +129,7 @@ define([
                     text: obj.get('Name'),
                     type: 'obj',
                     // query to grab the attributes
-                    children: this._getChildrenNodesForParent(obj),
+                    children: this._getChildrenNodesForParentObject(obj),
                 }
             }));
             $('.mxreflectionselector').jstree({
@@ -129,7 +147,8 @@ define([
                         icon: "glyphicon glyphicon-list"
                     },
                     "assc": {
-                        icon: "glyphicon glyphicon-link"
+                        icon: "glyphicon glyphicon-link",
+                        valid_children: ['obj']
                     }
                 },
                 core: {
