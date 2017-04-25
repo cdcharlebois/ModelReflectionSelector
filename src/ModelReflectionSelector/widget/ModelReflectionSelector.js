@@ -36,6 +36,8 @@ define([
         _entities: null,
         _associations: null,
         _members: null,
+
+        // promises
         __getObjects: null,
         __getAssociations: null,
         __getMembers: null,
@@ -50,7 +52,7 @@ define([
                     mx.data.get({
                         xpath: "//MxModelReflection.MxObjectType",
                         callback: lang.hitch(this, function(objs) {
-                            console.log("Received " + objs.length + " MxObjects");
+                            // console.log("Received " + objs.length + " MxObjects");
                             this._entities = objs;
                             resolve();
                         }),
@@ -66,7 +68,7 @@ define([
                     mx.data.get({
                         xpath: "//MxModelReflection.MxObjectReference",
                         callback: lang.hitch(this, function(objs) {
-                            console.log("Received " + objs.length + " MxObjects");
+                            // console.log("Received " + objs.length + " MxObjects");
                             this._associations = objs;
                             resolve();
                         }),
@@ -82,7 +84,7 @@ define([
                     mx.data.get({
                         xpath: "//MxModelReflection.MxObjectMember",
                         callback: lang.hitch(this, function(objs) {
-                            console.log("Received " + objs.length + " MxObjects");
+                            // console.log("Received " + objs.length + " MxObjects");
                             this._members = objs;
                             resolve();
                         }),
@@ -111,7 +113,16 @@ define([
                     this._updateRendering(callback);
                 }))
                 .catch(lang.hitch(this, function(error) {
-                    console.log(error.message + '\n? is Model Reflection Installed?');
+                    console.error("_    _ _                           _ \n" +
+                        "| |  | | |                         | |\n" +
+                        "| |  | | |__   ___   ___  _ __  ___| |\n" +
+                        "| |/\\| | '_ \\ / _ \\ / _ \\| '_ \\/ __| |\n" +
+                        "\\  /\\  / | | | (_) | (_) | |_) \\__ \\_|\n" +
+                        " \\/  \\/|_| |_|\\___/ \\___/| .__/|___(_)\n" +
+                        "                         | |          \n" +
+                        "                         |_|          \n" +
+                        "is Model Reflection installed and turned on?");
+                    this._executeCallback(callback);
                 }));
             // this.__getObjects
             //     .then(this.__getAssociations)
@@ -253,6 +264,7 @@ define([
                     }
                     // child.id = child.text + '_2';
                     var newChild = JSON.parse(JSON.stringify(child));
+                    // remove further associations to prevent infinite loops
                     newChild.children = newChild.children.filter(function(c) {
                         return c.type != 'assc';
                     });
