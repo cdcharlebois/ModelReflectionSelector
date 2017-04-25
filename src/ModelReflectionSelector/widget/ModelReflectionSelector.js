@@ -36,9 +36,62 @@ define([
         _entities: null,
         _associations: null,
         _members: null,
+        __getObjects: null,
+        __getAssociations: null,
+        __getMembers: null,
+
+
+
 
         constructor: function() {
             this._handles = [];
+            this.__getObjects = new Promise(
+                lang.hitch(this, function(resolve, reject) {
+                    mx.data.get({
+                        xpath: "//MxModelReflection.MxObjectType",
+                        callback: lang.hitch(this, function(objs) {
+                            console.log("Received " + objs.length + " MxObjects");
+                            this._entities = objs;
+                            resolve();
+                        }),
+                        error: lang.hitch(function(err) {
+                            reject('could not fetch objects')
+                        })
+                    });
+                })
+            );
+
+            this.__getAssociations = new Promise(
+                lang.hitch(this, function(resolve, reject) {
+                    mx.data.get({
+                        xpath: "//MxModelReflection.MxObjectReference",
+                        callback: lang.hitch(this, function(objs) {
+                            console.log("Received " + objs.length + " MxObjects");
+                            this._associations = objs;
+                            resolve();
+                        }),
+                        error: lang.hitch(function(err) {
+                            reject('could not fetch associations')
+                        })
+                    });
+                })
+            );
+
+            this.__getMembers = new Promise(
+                lang.hitch(this, function(resolve, reject) {
+                    mx.data.get({
+                        xpath: "//MxModelReflection.MxObjectMember",
+                        callback: lang.hitch(this, function(objs) {
+                            console.log("Received " + objs.length + " MxObjects");
+                            this._members = objs;
+                            resolve();
+                        }),
+                        error: lang.hitch(function(err) {
+                            reject('could not fetch members')
+                        })
+                    });
+                })
+            );
         },
 
         postCreate: function() {
@@ -49,39 +102,59 @@ define([
         },
 
         update: function(obj, callback) {
-            mx.data.get({
-                xpath: "//MxModelReflection.MxObjectType",
-                // xpath: "//MxModelReflection.MxObjectReference",
-                callback: lang.hitch(this, function(objs) {
-                    console.log("Received " + objs.length + " MxObjects");
-                    // this._rfxObjects = objs;
-                    // this._renderCheckboxes(objs);
-                    this._entities = objs; // set entities
-                    mx.data.get({
-                        // xpath: "//MxModelReflection.MxObjectType",
-                        xpath: "//MxModelReflection.MxObjectReference",
-                        callback: lang.hitch(this, function(objs) {
-                            console.log("Received " + objs.length + " MxObjects");
-                            // this._rfxObjects = objs;
-                            // this._renderCheckboxes(objs);
-                            this._associations = objs; // set associations...
-                            mx.data.get({
-                                // xpath: "//MxModelReflection.MxObjectType",
-                                xpath: "//MxModelReflection.MxObjectMember",
-                                callback: lang.hitch(this, function(objs) {
-                                    console.log("Received " + objs.length + " MxObjects");
-                                    // this._rfxObjects = objs;
-                                    // this._renderCheckboxes(objs);
-                                    this._members = objs; // set members...
+            Promise.all([
+                    this.__getObjects,
+                    this.__getAssociations,
+                    this.__getMembers
+                ])
+                .then(lang.hitch(this, function(fulfilled) {
+                    this._updateRendering(callback);
+                }))
+                .catch(lang.hitch(this, function(error) {
+                    console.log(error.message + '\n? is Model Reflection Installed?');
+                }));
+            // this.__getObjects
+            //     .then(this.__getAssociations)
+            //     .then(this.__getMembers)
+            //     .then()
+            //     .catch(function(error) {
+            //         console.log(error.message)
+            //     });
+            // // this._updateRendering(callback);
+            // 
+            // mx.data.get({
+            //     xpath: "//MxModelReflection.MxObjectType",
+            //     // xpath: "//MxModelReflection.MxObjectReference",
+            //     callback: lang.hitch(this, function(objs) {
+            //         console.log("Received " + objs.length + " MxObjects");
+            //         // this._rfxObjects = objs;
+            //         // this._renderCheckboxes(objs);
+            //         this._entities = objs; // set entities
+            //         mx.data.get({
+            //             // xpath: "//MxModelReflection.MxObjectType",
+            //             xpath: "//MxModelReflection.MxObjectReference",
+            //             callback: lang.hitch(this, function(objs) {
+            //                 console.log("Received " + objs.length + " MxObjects");
+            //                 // this._rfxObjects = objs;
+            //                 // this._renderCheckboxes(objs);
+            //                 this._associations = objs; // set associations...
+            //                 mx.data.get({
+            //                     // xpath: "//MxModelReflection.MxObjectType",
+            //                     xpath: "//MxModelReflection.MxObjectMember",
+            //                     callback: lang.hitch(this, function(objs) {
+            //                         console.log("Received " + objs.length + " MxObjects");
+            //                         // this._rfxObjects = objs;
+            //                         // this._renderCheckboxes(objs);
+            //                         this._members = objs; // set members...
 
-                                    this._contextObj = obj;
-                                    this._updateRendering(callback);
-                                })
-                            }, this);
-                        })
-                    }, this);
-                })
-            }, this);
+            //                         this._contextObj = obj;
+            //                         this._updateRendering(callback);
+            //                     })
+            //                 }, this);
+            //             })
+            //         }, this);
+            //     })
+            // }, this);
 
             logger.debug(this.id + ".update");
 
