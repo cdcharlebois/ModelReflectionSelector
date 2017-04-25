@@ -43,9 +43,9 @@ define([
 
         postCreate: function() {
             logger.debug(this.id + ".postCreate");
-            $(this.submitButton).on('click', function() {
-                console.log($('.mxreflectionselector').jstree().get_selected(true));
-            });
+            $(this.submitButton).on('click', lang.hitch(this, function() {
+                this._formatOutput($('.mxreflectionselector').jstree().get_checked(true));
+            }));
         },
 
         update: function(obj, callback) {
@@ -96,6 +96,55 @@ define([
             logger.debug(this.id + ".uninitialize");
         },
 
+        _formatOutput: function(data) {
+            // {
+            // objectType: "TestData.Customer",             node.text
+            // all: "true",                                 true
+            // "members": {                                 
+            //     "TestData.Address_Customer": {           node.children[i].text
+            //         "objectType": "TestData.Address",    node.children[i].text
+            //         all: true
+            //     },
+            // }
+            var ret = {};
+
+            console.log(data)
+        },
+
+        _buildLinks: function(data) {
+            // given the json data for the tree:
+            // for each node that has a child node (a) of type 'assc'
+            // find the node on the other end
+            // add as child of node (a)
+            data.forEach(function(node) {
+                var associationNodes = node.children.filter(function(childNode) {
+                    return childNode.type === 'assc'
+                });
+                associationNodes.forEach(function(associationNode) {
+                    var child = null;
+                    if (node.data.guid === associationNode.data.parent) {
+                        // add the child node
+                        child = data.find(function(n) {
+                            return n.data.guid === associationNode.data.child;
+                        })
+                    } else {
+                        // add the parent node
+                        child = data.find(function(n) {
+                            return n.data.guid === associationNode.data.parent;
+                        })
+                    }
+                    // child.id = child.text + '_2';
+                    var newChild = JSON.parse(JSON.stringify(child));
+                    newChild.children = newChild.children.filter(function(c) {
+                        return c.type != 'assc';
+                    });
+                    // newChild.data.level = 2;
+                    associationNode.children = [newChild];
+                });
+
+            });
+        },
+
         _getChildrenNodesForParentObject: function(parent) {
             var ret = [];
             // given a parent ID
@@ -106,7 +155,13 @@ define([
                     a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0] === pid) {
                     ret.push({
                         text: a.get('Name'),
-                        type: 'assc'
+                        type: 'assc',
+                        data: {
+                            guid: a.getGuid(),
+                            name: a.get('CompleteName'),
+                            parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0],
+                            child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0]
+                        }
                     });
                 }
             });
@@ -114,7 +169,11 @@ define([
                 if (a.get("MxModelReflection.MxObjectMember_MxObjectType") === pid) {
                     ret.push({
                         text: a.get('AttributeName'),
-                        type: 'attr'
+                        type: 'attr',
+                        data: {
+                            guid: a.getGuid(),
+                            name: a.get('CompleteName')
+                        }
                     });
                 }
             });
@@ -130,8 +189,13 @@ define([
                     type: 'obj',
                     // query to grab the attributes
                     children: this._getChildrenNodesForParentObject(obj),
+                    data: {
+                        guid: obj.getGuid(),
+                        name: obj.get('CompleteName')
+                    }
                 }
             }));
+            this._buildLinks(data);
             $('.mxreflectionselector').jstree({
                 plugins: ['checkbox', 'wholerow', 'types', 'state'],
                 checkbox: {
