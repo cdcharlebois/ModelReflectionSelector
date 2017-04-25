@@ -97,6 +97,7 @@ define([
         },
 
         _formatOutput: function(data) {
+            var self = this;
             // {
             // objectType: "TestData.Customer",             node.text
             // all: "true",                                 true
@@ -106,9 +107,53 @@ define([
             //         all: true
             //     },
             // }
-            var ret = {};
+            var ret = [];
+            // get top level objects
+            var topLevelObjects = data.filter(function(node) {
+                return node.data.level === 1;
+            });
+            topLevelObjects.forEach(function(obj) {
+                var dxobj = {
+                    objectType: obj.data.name,
+                    all: true,
+                    members: {}
+                };
+                var children = self.__getChildren(data, obj);
+                children.forEach(function(child) {
+                    if (child.type === 'attr') {
+                        // if attribute, add it as a member
+                        dxobj.members[child.data.name.split(' / ')[1]] = true;
+                    } else if (child.type === 'assc') {
+                        // if association, add the association as a property and then embed the object below
+                        // get the association's child
+                        var childObj = self.__getChildren(data, child)[0];
+                        // get child attributes again
+                        var childObjChildren = self.__getChildren(data, childObj);
+                        var tempMembers = {};
+                        childObjChildren.forEach(function(child) {
+                            tempMembers[child.data.name.split(' / ')[1]] = true;
+                        });
+                        dxobj.members[child.data.name] = {
+                            objectType: childObj.data.name,
+                            all: true,
+                            members: tempMembers
+                        };
 
-            console.log(data)
+                    }
+
+                });
+                ret.push(dxobj);
+            });
+
+            console.log(data);
+            console.log(JSON.stringify(ret[0]));
+        },
+
+        // get children nodes of `parent` in `tree`
+        __getChildren: function(tree, parent) {
+            return tree.filter(function(node) {
+                return node.parent === parent.id
+            });
         },
 
         _buildLinks: function(data) {
@@ -138,7 +183,7 @@ define([
                     newChild.children = newChild.children.filter(function(c) {
                         return c.type != 'assc';
                     });
-                    // newChild.data.level = 2;
+                    newChild.data.level = 3;
                     associationNode.children = [newChild];
                 });
 
@@ -160,7 +205,8 @@ define([
                             guid: a.getGuid(),
                             name: a.get('CompleteName'),
                             parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0],
-                            child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0]
+                            child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0],
+                            level: 2
                         }
                     });
                 }
@@ -172,7 +218,8 @@ define([
                         type: 'attr',
                         data: {
                             guid: a.getGuid(),
-                            name: a.get('CompleteName')
+                            name: a.get('CompleteName'),
+                            level: 2
                         }
                     });
                 }
@@ -191,7 +238,8 @@ define([
                     children: this._getChildrenNodesForParentObject(obj),
                     data: {
                         guid: obj.getGuid(),
-                        name: obj.get('CompleteName')
+                        name: obj.get('CompleteName'),
+                        level: 1
                     }
                 }
             }));
@@ -200,7 +248,8 @@ define([
                 plugins: ['checkbox', 'wholerow', 'types', 'state'],
                 checkbox: {
                     keep_selected_style: false,
-                    three_state: true
+                    three_state: false,
+                    cascade: 'down'
                 },
                 types: {
                     "obj": {
