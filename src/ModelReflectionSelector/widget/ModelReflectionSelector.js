@@ -219,7 +219,7 @@ define([
                         });
                         dxobj.members[child.data.name] = {
                             objectType: childObj.data.name,
-                            all: true,
+                            all: false,
                             members: tempMembers
                         };
 
