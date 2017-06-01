@@ -282,7 +282,7 @@ define([
                 if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0] === pid ||
                     a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0] === pid) {
                     ret.push({
-                        text: a.get('Name'),
+                        text: a.get('CompleteName'),
                         type: 'assc',
                         data: {
                             guid: a.getGuid(),
@@ -319,7 +319,7 @@ define([
         _renderCheckboxes: function() {
             var data = this._entities.map(lang.hitch(this, function(obj) {
                 return {
-                    text: obj.get('Name'),
+                    text: obj.get('CompleteName'),
                     type: 'obj',
                     // query to grab the attributes
                     children: this._getChildrenNodesForParentObject(obj),
