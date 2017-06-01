@@ -199,7 +199,6 @@ define([
             topLevelObjects.forEach(function(obj) {
                 var dxobj = {
                     objectType: obj.data.name,
-                    all: true,
                     members: {}
                 };
                 var children = self.__getChildren(data, obj);
@@ -219,7 +218,6 @@ define([
                         });
                         dxobj.members[child.data.name] = {
                             objectType: childObj.data.name,
-                            all: false,
                             members: tempMembers
                         };
 
