@@ -309,7 +309,11 @@ define([
                     });
                 }
             });
-            return ret;
+            return ret.sort(function(a, b) {
+                if (a.text < b.text) return -1;
+                else if (a.text > b.text) return 1;
+                return 0;
+            });
             // .get("MxModelReflection.MxObjectReference_MxObjectType_Parent")
             // .get("MxModelReflection.MxObjectReference_MxObjectType_Child")
         },
@@ -327,7 +331,11 @@ define([
                         level: 1
                     }
                 }
-            }));
+            })).sort(function(a, b) {
+                if (a.text < b.text) return -1;
+                else if (a.text > b.text) return 1;
+                return 0;
+            });
             this._buildLinks(data);
             $('.mxreflectionselector').jstree({
                 plugins: ['checkbox', 'wholerow', 'types', 'state'],
