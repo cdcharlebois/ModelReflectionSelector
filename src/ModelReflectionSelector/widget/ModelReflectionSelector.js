@@ -250,6 +250,27 @@ define([
             });
         },
 
+        /*
+         *   starting at an entity node,
+         *      1. Get all association children (A)
+         *      2. For each association child (B)
+         *          a. get the entity at the other end
+         *          b. set as child of 2.
+         *          c. set depth to 2.level + 1
+         *              i.   get all association children (A)
+         *              ii.  for each association child (B)
+         *              iii. go to a.
+         */
+        _addAssociatedObjects: function(node) {},
+
+        // should take a `depth` parameter
+        // given the json data for the tree:
+        // for each node[1] that has a child node (a) of type 'assc'
+        // find the node on the other end [2]
+        // add as child of node (a)
+        // for each node [2] that has a child node (b) of type 'assc'
+        // find the node on the other end [3]
+        // add as child of node (b)
         _buildLinks: function(data) {
             // given the json data for the tree:
             // for each node that has a child node (a) of type 'assc'
@@ -259,6 +280,7 @@ define([
                 var associationNodes = node.children.filter(function(childNode) {
                     return childNode.type === 'assc'
                 });
+                // nodes with associations
                 associationNodes.forEach(function(associationNode) {
                     var child = null;
                     if (node.data.guid === associationNode.data.parent) {
@@ -274,6 +296,7 @@ define([
                     }
                     // child.id = child.text + '_2';
                     var newChild = JSON.parse(JSON.stringify(child));
+                    // newChild.data.level = associationNode.data.level + 1
                     // remove further associations to prevent infinite loops
                     newChild.children = newChild.children.filter(function(c) {
                         return c.type != 'assc';
