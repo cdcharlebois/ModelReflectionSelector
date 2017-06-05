@@ -29,6 +29,7 @@ define([
 
 
         widgetBase: null,
+        outputAttribute: null,
 
         // Internal variables.
         _handles: null,
@@ -104,6 +105,7 @@ define([
         },
 
         update: function(obj, callback) {
+            this._contextObj = obj;
             Promise.all([
                     this.__getObjects,
                     this.__getAssociations,
@@ -229,6 +231,16 @@ define([
 
             console.log(data);
             console.log(JSON.stringify(ret[0]));
+            this._contextObj.set(this.outputAttribute, JSON.stringify(ret[0]))
+            mx.data.commit({
+                mxobj: this._contextObj,
+                callback: function() {
+                    console.log("Object committed");
+                },
+                error: function(e) {
+                    console.error("Error occurred attempting to commit: " + e);
+                }
+            });
         },
 
         // get children nodes of `parent` in `tree`

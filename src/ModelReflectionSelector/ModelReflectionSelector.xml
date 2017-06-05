@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<widget id="ModelReflectionSelector.widget.ModelReflectionSelector" needsEntityContext="false" xmlns="http://www.mendix.com/widget/1.0/">
+<widget id="ModelReflectionSelector.widget.ModelReflectionSelector" needsEntityContext="true" xmlns="http://www.mendix.com/widget/1.0/">
     <name>ModelReflectionSelector</name>
     <description>The description of this widget.</description>
 
     <icon />
 
     <properties>
-        <property key="dummyKey" type="string" required="false" defaultValue="">
-            <caption>Dummy key</caption>
-            <category>Appearance</category>
-            <description>This key was added to make the widget work in the Modeler (needs atleast 1 key). Please change/remove this one</description>
+        <property key="outputAttribute" type="attribute" required="true" isPath="optional" pathType="reference">
+            <caption>Output Attribute</caption>
+            <category>General</category>
+            <description>Where to output the JSON</description>
+            <attributeTypes>
+                <attributeType name="String" />
+            </attributeTypes>
         </property>
     </properties>
 </widget>
