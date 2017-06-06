@@ -182,56 +182,92 @@ define([
             logger.debug(this.id + ".uninitialize");
         },
 
-        _formatOutput: function(data) {
+        __buildOutput: function(thisnode, selected) {
             var self = this;
-            // {
-            // objectType: "TestData.Customer",             node.text
-            // all: "true",                                 true
-            // "members": {                                 
-            //     "TestData.Address_Customer": {           node.children[i].text
-            //         "objectType": "TestData.Address",    node.children[i].text
-            //         all: true
-            //     },
-            // }
-            var ret = [];
-            // get top level objects
-            var topLevelObjects = data.filter(function(node) {
-                return node.data.level === 1;
-            });
-            topLevelObjects.forEach(function(obj) {
-                var dxobj = {
-                    objectType: obj.data.name,
-                    members: {}
-                };
-                var children = self.__getChildrenInTree(data, obj);
-                children.forEach(function(child) {
-                    if (child.type === 'attr') {
-                        // if attribute, add it as a member
-                        dxobj.members[child.data.name.split(' / ')[1]] = true;
-                    } else if (child.type === 'assc') {
-                        // if association, add the association as a property and then embed the object below
-                        // get the association's child
-                        var childObj = self.__getChildrenInTree(data, child)[0];
-                        // get child attributes again
-                        var childObjChildren = self.__getChildrenInTree(data, childObj);
-                        var tempMembers = {};
-                        childObjChildren.forEach(function(child) {
-                            tempMembers[child.data.name.split(' / ')[1]] = true;
-                        });
-                        dxobj.members[child.data.name] = {
-                            objectType: childObj.data.name,
-                            members: tempMembers
-                        };
-
-                    }
-
+            var ret = {};
+            // if @node is an object,
+            if (thisnode.type === 'obj') {
+                // objecttype
+                ret.objectType = thisnode.data.name;
+                // members
+                ret.members = {}
+                var myMembers = selected.filter(function(node) {
+                    return node.parent === thisnode.id && node.type !== 'assc'
                 });
-                ret.push(dxobj);
-            });
+                myMembers.forEach(function(member) {
+                    ret.members[member.data.name.split(' / ')[1]] = true;
+                });
+                // associations
+                var myAssociations = selected.filter(function(node) {
+                    return node.parent === thisnode.id && node.type === 'assc'
+                });
+                myAssociations.forEach(function(association) {
+                    ret.members[association.data.name] = self.__buildOutput(association, selected)
+                });
+            } else if (thisnode.type === 'assc') {
+                // get the child object
+                var child = selected.find(function(node) {
+                    return node.parent === thisnode.id;
+                });
+                // return __buildoutput for the child
+                return self.__buildOutput(child, selected);
+            }
+            return ret;
 
-            console.log(data);
-            console.log(JSON.stringify(ret[0]));
-            this._contextObj.set(this.outputAttribute, JSON.stringify(ret[0]))
+        },
+
+        _formatOutput: function(data) {
+            var output = this.__buildOutput(data[0], data);
+            console.log(output);
+            // // console.log(data);
+            // var self = this;
+            // // {
+            // // objectType: "TestData.Customer",             node.text
+            // // all: "true",                                 true
+            // // "members": {                                 
+            // //     "TestData.Address_Customer": {           node.children[i].text
+            // //         "objectType": "TestData.Address",    node.children[i].text
+            // //         all: true
+            // //     },
+            // // }
+            // var ret = [];
+            // // get top level objects
+            // var topLevelObjects = data.filter(function(node) {
+            //     return node.data.level === 1;
+            // });
+            // topLevelObjects.forEach(function(obj) {
+            //     var dxobj = {
+            //         objectType: obj.data.name,
+            //         members: {}
+            //     };
+            //     var children = self.__getChildrenInTree(data, obj); // level 2
+            //     children.forEach(function(child) {
+            //         if (child.type === 'attr') {
+            //             // if attribute, add it as a member
+            //             dxobj.members[child.data.name.split(' / ')[1]] = true;
+            //         } else if (child.type === 'assc') {
+            //             // if association, add the association as a property and then embed the object below
+            //             // get the association's child
+            //             var childObj = self.__getChildrenInTree(data, child)[0]; // level 3 (skip)
+            //             // get child attributes again
+            //             var childObjChildren = self.__getChildrenInTree(data, childObj); // level 4
+            //             var tempMembers = {};
+            //             childObjChildren.forEach(function(child) {
+            //                 tempMembers[child.data.name.split(' / ')[1]] = true;
+            //             });
+            //             dxobj.members[child.data.name] = {
+            //                 objectType: childObj.data.name,
+            //                 members: tempMembers
+            //             };
+            //         }
+
+            //     });
+            //     ret.push(dxobj);
+            // });
+
+            // console.log(data);
+            // console.log(JSON.stringify(ret[0]));
+            this._contextObj.set(this.outputAttribute, JSON.stringify(output))
             mx.data.commit({
                 mxobj: this._contextObj,
                 callback: function() {
@@ -289,7 +325,7 @@ define([
             });
         },
 
-        _getChildrenNodesForParentObject: function(pid) {
+        _getChildrenNodesForParentObject: function(pid, parentlevel) {
             var ret = [];
             // given a parent ID
             // var pid = parent.getGuid();
@@ -307,7 +343,7 @@ define([
                             name: a.get('CompleteName'),
                             parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0],
                             child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0],
-                            level: 2
+                            level: parentlevel + 1
                         }
                     });
                 }
@@ -321,7 +357,7 @@ define([
                             treeparent: pid,
                             guid: a.getGuid(),
                             name: a.get('CompleteName'),
-                            level: 2
+                            level: parentlevel + 1
                         }
                     });
                 }
@@ -418,7 +454,7 @@ define([
         __getChildren2: function(node) {
             var childrenNodes = []
             if (node.type != 'assc') {
-                childrenNodes = childrenNodes.concat(this._getChildrenNodesForParentObject(node.data.guid));
+                childrenNodes = childrenNodes.concat(this._getChildrenNodesForParentObject(node.data.guid, node.data.level));
             } else {
                 // this is an association
                 childrenNodes = childrenNodes.concat(this.__getAssociationChildren(

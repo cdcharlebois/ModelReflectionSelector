@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<widget id="ModelReflectionSelector.widget.ModelReflectionSelector" needsEntityContext="false" xmlns="http://www.mendix.com/widget/1.0/">
+<widget id="ModelReflectionSelector.widget.ModelReflectionSelector" needsEntityContext="true" xmlns="http://www.mendix.com/widget/1.0/">
     <name>ModelReflectionSelector</name>
     <description>The description of this widget.</description>
 
     <icon />
 
     <properties>
-    <property key="dummy" type="string" required="false" defaultValue="">
+    <!--<property key="dummy" type="string" required="false" defaultValue="">
         <caption>dummy key</caption>
         <category>General</category>
         <description></description>
-    </property>
-        <!--<property key="outputAttribute" type="attribute" required="false" isPath="optional" pathType="reference">
+    </property>-->
+        <property key="outputAttribute" type="attribute" required="false" isPath="optional" pathType="reference">
             <caption>Output Attribute</caption>
             <category>General</category>
             <description>Where to output the JSON</description>
             <attributeTypes>
                 <attributeType name="String" />
             </attributeTypes>
-        </property>-->
+        </property>
     </properties>
 </widget>
