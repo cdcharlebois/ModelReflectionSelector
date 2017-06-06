@@ -250,27 +250,8 @@ define([
             });
         },
 
-        /*
-         *   starting at an entity node,
-         *      1. Get all association children (A)
-         *      2. For each association child (B)
-         *          a. get the entity at the other end
-         *          b. set as child of 2.
-         *          c. set depth to 2.level + 1
-         *              i.   get all association children (A)
-         *              ii.  for each association child (B)
-         *              iii. go to a.
-         */
-        _addAssociatedObjects: function(node) {},
 
-        // should take a `depth` parameter
-        // given the json data for the tree:
-        // for each node[1] that has a child node (a) of type 'assc'
-        // find the node on the other end [2]
-        // add as child of node (a)
-        // for each node [2] that has a child node (b) of type 'assc'
-        // find the node on the other end [3]
-        // add as child of node (b)
+
         _buildLinks: function(data) {
             // given the json data for the tree:
             // for each node that has a child node (a) of type 'assc'
@@ -308,10 +289,10 @@ define([
             });
         },
 
-        _getChildrenNodesForParentObject: function(parent) {
+        _getChildrenNodesForParentObject: function(pid) {
             var ret = [];
             // given a parent ID
-            var pid = parent.getGuid();
+            // var pid = parent.getGuid();
             // find all associations whose parent or child is this parent ID
             this._associations.forEach(function(a) {
                 if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0] === pid ||
@@ -319,7 +300,9 @@ define([
                     ret.push({
                         text: a.get('CompleteName'),
                         type: 'assc',
+                        children: true,
                         data: {
+                            treeparent: pid,
                             guid: a.getGuid(),
                             name: a.get('CompleteName'),
                             parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0],
@@ -335,6 +318,7 @@ define([
                         text: a.get('AttributeName'),
                         type: 'attr',
                         data: {
+                            treeparent: pid,
                             guid: a.getGuid(),
                             name: a.get('CompleteName'),
                             level: 2
@@ -352,12 +336,13 @@ define([
         },
 
         _renderCheckboxes: function() {
+            var self = this;
             var data = this._entities.map(lang.hitch(this, function(obj) {
                 return {
                     text: obj.get('CompleteName'),
                     type: 'obj',
                     // query to grab the attributes
-                    children: this._getChildrenNodesForParentObject(obj),
+                    children: true,
                     data: {
                         guid: obj.getGuid(),
                         name: obj.get('CompleteName'),
@@ -369,7 +354,10 @@ define([
                 else if (a.text > b.text) return 1;
                 return 0;
             });
-            this._buildLinks(data);
+            // this._buildLinks2(data, 2);
+            // this._buildLinks(data);
+            // console.log("Final Data in Tree:")
+            // console.log(data);
             $('.mxreflectionselector').jstree({
                 plugins: ['checkbox', 'wholerow', 'types', 'state'],
                 checkbox: {
@@ -395,9 +383,63 @@ define([
                         variant: 'large',
                         stripes: true
                     },
-                    data: data
+                    // data: data,
+                    data: function(node, render) {
+                        if (node.id === '#') {
+                            render(data) //
+                        } else {
+                            render(self.__getChildren2(node)) //function to get children
+                        }
+                    }
+
                 }
             });
+        },
+
+        __getChildren2: function(node) {
+            debugger;
+            var childrenNodes = []
+            if (node.type != 'assc') {
+                childrenNodes = childrenNodes.concat(this._getChildrenNodesForParentObject(node.data.guid));
+            } else {
+                // this is an association
+                childrenNodes = childrenNodes.concat(this.__getAssociationChildren(
+                    node.data.parent,
+                    node.data.child,
+                    node.data.treeparent,
+                    node.data.level
+                ))
+            }
+
+            return childrenNodes;
+        },
+
+        __getAssociationChildren: function(pid, cid, treeparent, parentlevel) {
+            var retObject;
+            // if the treeparent is the parent
+            if (pid == treeparent) {
+                // get the child
+                retObject = this._entities.find(function(n) {
+                    return n.getGuid() === cid
+                })
+            }
+            // else get the parent
+            else {
+                retObject = this._entities.find(function(n) {
+                    return n.getGuid() === pid
+                })
+            }
+            return [{
+                text: retObject.get('CompleteName'),
+                type: 'obj',
+                // query to grab the attributes
+                children: true,
+                data: {
+                    guid: retObject.getGuid(),
+                    name: retObject.get('CompleteName'),
+                    level: parentlevel + 1
+                }
+            }];
         },
 
         _updateRendering: function(callback) {
