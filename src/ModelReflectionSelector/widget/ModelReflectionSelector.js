@@ -203,7 +203,7 @@ define([
                     objectType: obj.data.name,
                     members: {}
                 };
-                var children = self.__getChildren(data, obj);
+                var children = self.__getChildrenInTree(data, obj);
                 children.forEach(function(child) {
                     if (child.type === 'attr') {
                         // if attribute, add it as a member
@@ -211,9 +211,9 @@ define([
                     } else if (child.type === 'assc') {
                         // if association, add the association as a property and then embed the object below
                         // get the association's child
-                        var childObj = self.__getChildren(data, child)[0];
+                        var childObj = self.__getChildrenInTree(data, child)[0];
                         // get child attributes again
-                        var childObjChildren = self.__getChildren(data, childObj);
+                        var childObjChildren = self.__getChildrenInTree(data, childObj);
                         var tempMembers = {};
                         childObjChildren.forEach(function(child) {
                             tempMembers[child.data.name.split(' / ')[1]] = true;
@@ -244,7 +244,7 @@ define([
         },
 
         // get children nodes of `parent` in `tree`
-        __getChildren: function(tree, parent) {
+        __getChildrenInTree: function(tree, parent) {
             return tree.filter(function(node) {
                 return node.parent === parent.id
             });
@@ -359,11 +359,29 @@ define([
             // console.log("Final Data in Tree:")
             // console.log(data);
             $('.mxreflectionselector').jstree({
-                plugins: ['checkbox', 'wholerow', 'types', 'state'],
+                plugins: ['checkbox', 'wholerow', 'types', 'state', 'contextmenu'],
                 checkbox: {
                     keep_selected_style: false,
                     three_state: false,
                     cascade: 'down'
+                },
+                contextmenu: {
+                    items: function(node) {
+                        if (node.type !== 'attr')
+                            return null
+                        else {
+                            return {
+                                useaskey: {
+                                    label: 'Use as key',
+                                    action: function(e) {
+                                        //somehow show that this node is a key
+                                        node.data.isKey = true;
+                                        node.text += " 🔑";
+                                    }
+                                }
+                            };
+                        }
+                    },
                 },
                 types: {
                     "obj": {
@@ -379,6 +397,7 @@ define([
                     }
                 },
                 core: {
+                    check_callback: true,
                     themes: {
                         variant: 'large',
                         stripes: true
@@ -397,7 +416,6 @@ define([
         },
 
         __getChildren2: function(node) {
-            debugger;
             var childrenNodes = []
             if (node.type != 'assc') {
                 childrenNodes = childrenNodes.concat(this._getChildrenNodesForParentObject(node.data.guid));
