@@ -30,6 +30,7 @@ define([
 
         widgetBase: null,
         outputAttribute: null,
+		clickMicroflow: null,
 
         // Internal variables.
         _handles: null,
@@ -210,64 +211,31 @@ define([
                     return node.parent === thisnode.id;
                 });
                 // return __buildoutput for the child
-                return self.__buildOutput(child, selected);
+				
+				//Child can be null if we only check the association box but not the enity or attributes
+				if( child != null )
+					return self.__buildOutput(child, selected);
             }
             return ret;
 
         },
 
         _formatOutput: function(data) {
+			if( data.length == 0 ) {
+				mx.ui.info( 'Please select at least 1 enity' );
+				return;
+			}
+			
             var output = this.__buildOutput(data[0], data);
+			var jsonOutput = JSON.stringify(output);
+			if( jsonOutput == '{}' ) {
+				mx.ui.info( 'Please select at least 1 enity' );
+				return;
+			}
+			
             console.log(output);
-            // // console.log(data);
-            // var self = this;
-            // // {
-            // // objectType: "TestData.Customer",             node.text
-            // // all: "true",                                 true
-            // // "members": {                                 
-            // //     "TestData.Address_Customer": {           node.children[i].text
-            // //         "objectType": "TestData.Address",    node.children[i].text
-            // //         all: true
-            // //     },
-            // // }
-            // var ret = [];
-            // // get top level objects
-            // var topLevelObjects = data.filter(function(node) {
-            //     return node.data.level === 1;
-            // });
-            // topLevelObjects.forEach(function(obj) {
-            //     var dxobj = {
-            //         objectType: obj.data.name,
-            //         members: {}
-            //     };
-            //     var children = self.__getChildrenInTree(data, obj); // level 2
-            //     children.forEach(function(child) {
-            //         if (child.type === 'attr') {
-            //             // if attribute, add it as a member
-            //             dxobj.members[child.data.name.split(' / ')[1]] = true;
-            //         } else if (child.type === 'assc') {
-            //             // if association, add the association as a property and then embed the object below
-            //             // get the association's child
-            //             var childObj = self.__getChildrenInTree(data, child)[0]; // level 3 (skip)
-            //             // get child attributes again
-            //             var childObjChildren = self.__getChildrenInTree(data, childObj); // level 4
-            //             var tempMembers = {};
-            //             childObjChildren.forEach(function(child) {
-            //                 tempMembers[child.data.name.split(' / ')[1]] = true;
-            //             });
-            //             dxobj.members[child.data.name] = {
-            //                 objectType: childObj.data.name,
-            //                 members: tempMembers
-            //             };
-            //         }
 
-            //     });
-            //     ret.push(dxobj);
-            // });
-
-            // console.log(data);
-            // console.log(JSON.stringify(ret[0]));
-            this._contextObj.set(this.outputAttribute, JSON.stringify(output))
+            this._contextObj.set(this.outputAttribute, jsonOutput)
             mx.data.commit({
                 mxobj: this._contextObj,
                 callback: function() {
@@ -277,6 +245,8 @@ define([
                     console.error("Error occurred attempting to commit: " + e);
                 }
             });
+			
+			this._executeMicroflow(this.clickMicroflow, this._contextObj);
         },
 
         // get children nodes of `parent` in `tree`
@@ -287,6 +257,26 @@ define([
         },
 
 
+        _executeMicroflow : function (mf, obj) {
+            if (mf && obj) {
+                mx.data.action({
+                    store: {
+                       caller: this.mxform
+                    },
+                    params: {
+                        actionname  : mf,
+                        applyto     : "selection",
+                        guids       : [obj.getGuid()]
+                    },
+                    callback: function () {
+                        // ok
+                    },
+                    error: function (e) {
+                        logger.error("Error whiel executing microflow: " + mf + " error: " + e);
+                    }
+                });
+            }
+        },
 
         _buildLinks: function(data) {
             // given the json data for the tree:
@@ -327,9 +317,28 @@ define([
 
         _getChildrenNodesForParentObject: function(pid, parentlevel) {
             var ret = [];
-            // given a parent ID
+			
+			this._members = this._doSortOnText( this._members);
+            this._members.forEach(function(a) {
+                if (a.get("MxModelReflection.MxObjectMember_MxObjectType") === pid) {
+                    ret.push({
+                        text: a.get('AttributeName'),
+                        type: 'attr',
+                        data: {
+                            treeparent: pid,
+                            guid: a.getGuid(),
+                            name: a.get('CompleteName'),
+                            level: parentlevel + 1
+                        }
+                    });
+                }
+            });
+            
+		    // given a parent ID
             // var pid = parent.getGuid();
             // find all associations whose parent or child is this parent ID
+
+			this._associations = this._doSortOnText( this._associations);
             this._associations.forEach(function(a) {
                 if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0] === pid ||
                     a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0] === pid) {
@@ -348,28 +357,24 @@ define([
                     });
                 }
             });
-            this._members.forEach(function(a) {
-                if (a.get("MxModelReflection.MxObjectMember_MxObjectType") === pid) {
-                    ret.push({
-                        text: a.get('AttributeName'),
-                        type: 'attr',
-                        data: {
-                            treeparent: pid,
-                            guid: a.getGuid(),
-                            name: a.get('CompleteName'),
-                            level: parentlevel + 1
-                        }
-                    });
-                }
-            });
-            return ret.sort(function(a, b) {
+			
+			return ret;
+			/*return ret.sort(function(a, b) {
                 if (a.text < b.text) return -1;
                 else if (a.text > b.text) return 1;
                 return 0;
-            });
+            });*/
             // .get("MxModelReflection.MxObjectReference_MxObjectType_Parent")
             // .get("MxModelReflection.MxObjectReference_MxObjectType_Child")
         },
+		
+		_doSortOnText: function( array ) {
+			return array.sort(function(a, b) {
+					if (a.text < b.text) return -1;
+					else if (a.text > b.text) return 1;
+					return 0;
+				});
+		},
 
         _renderCheckboxes: function() {
             var self = this;
