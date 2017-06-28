@@ -30,6 +30,7 @@ define([
 
         widgetBase: null,
         outputAttribute: null,
+		clickMicroflow: null,
 
         // Internal variables.
         _handles: null,
@@ -189,18 +190,36 @@ define([
             if (thisnode.type === 'obj') {
                 // objecttype
                 ret.objectType = thisnode.data.name;
+
+                // Keys
+                var myKeys = selected.filter(function(node) {
+                    return node.parent === thisnode.id && node.type == 'attr' && node.data.isKey === true
+                });
+				if( myKeys.length > 0 ) {
+					ret.keys = {};
+					myKeys.forEach(function(member) {
+						ret.keys[member.data.name.split(' / ')[1]] = true;
+					});
+				}
+
                 // members
-                ret.members = {}
                 var myMembers = selected.filter(function(node) {
-                    return node.parent === thisnode.id && node.type !== 'assc'
+                    return node.parent === thisnode.id && node.type !== 'assc' //&& node.data.isKey !== true
                 });
-                myMembers.forEach(function(member) {
-                    ret.members[member.data.name.split(' / ')[1]] = true;
-                });
+				if( myMembers.length > 0 ) {
+					ret.members = {};
+					myMembers.forEach(function(member) {
+						ret.members[member.data.name.split(' / ')[1]] = true;
+					});
+				}
+				
                 // associations
                 var myAssociations = selected.filter(function(node) {
                     return node.parent === thisnode.id && node.type === 'assc'
                 });
+				// Only reset the .members if we have associations, and if members hasn't been created previously
+				if( ret.members == null && myAssociations.length > 0 )
+					ret.members = {};
                 myAssociations.forEach(function(association) {
                     ret.members[association.data.name] = self.__buildOutput(association, selected)
                 });
@@ -210,64 +229,31 @@ define([
                     return node.parent === thisnode.id;
                 });
                 // return __buildoutput for the child
-                return self.__buildOutput(child, selected);
+				
+				//Child can be null if we only check the association box but not the enity or attributes
+				if( child != null )
+					return self.__buildOutput(child, selected);
             }
             return ret;
 
         },
 
         _formatOutput: function(data) {
+			if( data.length == 0 ) {
+				mx.ui.info( 'Please select at least 1 enity' );
+				return;
+			}
+			
             var output = this.__buildOutput(data[0], data);
+			var jsonOutput = JSON.stringify(output);
+			if( jsonOutput == '{}' ) {
+				mx.ui.info( 'Please select at least 1 enity' );
+				return;
+			}
+			
             console.log(output);
-            // // console.log(data);
-            // var self = this;
-            // // {
-            // // objectType: "TestData.Customer",             node.text
-            // // all: "true",                                 true
-            // // "members": {                                 
-            // //     "TestData.Address_Customer": {           node.children[i].text
-            // //         "objectType": "TestData.Address",    node.children[i].text
-            // //         all: true
-            // //     },
-            // // }
-            // var ret = [];
-            // // get top level objects
-            // var topLevelObjects = data.filter(function(node) {
-            //     return node.data.level === 1;
-            // });
-            // topLevelObjects.forEach(function(obj) {
-            //     var dxobj = {
-            //         objectType: obj.data.name,
-            //         members: {}
-            //     };
-            //     var children = self.__getChildrenInTree(data, obj); // level 2
-            //     children.forEach(function(child) {
-            //         if (child.type === 'attr') {
-            //             // if attribute, add it as a member
-            //             dxobj.members[child.data.name.split(' / ')[1]] = true;
-            //         } else if (child.type === 'assc') {
-            //             // if association, add the association as a property and then embed the object below
-            //             // get the association's child
-            //             var childObj = self.__getChildrenInTree(data, child)[0]; // level 3 (skip)
-            //             // get child attributes again
-            //             var childObjChildren = self.__getChildrenInTree(data, childObj); // level 4
-            //             var tempMembers = {};
-            //             childObjChildren.forEach(function(child) {
-            //                 tempMembers[child.data.name.split(' / ')[1]] = true;
-            //             });
-            //             dxobj.members[child.data.name] = {
-            //                 objectType: childObj.data.name,
-            //                 members: tempMembers
-            //             };
-            //         }
 
-            //     });
-            //     ret.push(dxobj);
-            // });
-
-            // console.log(data);
-            // console.log(JSON.stringify(ret[0]));
-            this._contextObj.set(this.outputAttribute, JSON.stringify(output))
+            this._contextObj.set(this.outputAttribute, jsonOutput)
             mx.data.commit({
                 mxobj: this._contextObj,
                 callback: function() {
@@ -277,6 +263,8 @@ define([
                     console.error("Error occurred attempting to commit: " + e);
                 }
             });
+			
+			this._executeMicroflow(this.clickMicroflow, this._contextObj);
         },
 
         // get children nodes of `parent` in `tree`
@@ -287,6 +275,26 @@ define([
         },
 
 
+        _executeMicroflow : function (mf, obj) {
+            if (mf && obj) {
+                mx.data.action({
+                    store: {
+                       caller: this.mxform
+                    },
+                    params: {
+                        actionname  : mf,
+                        applyto     : "selection",
+                        guids       : [obj.getGuid()]
+                    },
+                    callback: function () {
+                        // ok
+                    },
+                    error: function (e) {
+                        logger.error("Error whiel executing microflow: " + mf + " error: " + e);
+                    }
+                });
+            }
+        },
 
         _buildLinks: function(data) {
             // given the json data for the tree:
@@ -303,12 +311,12 @@ define([
                     if (node.data.guid === associationNode.data.parent) {
                         // add the child node
                         child = data.find(function(n) {
-                            return n.data.guid === associationNode.data.child;
+                            return associationNode.data.child.indexOf( n.data.guid ) >= 0;
                         })
                     } else {
                         // add the parent node
                         child = data.find(function(n) {
-                            return n.data.guid === associationNode.data.parent;
+                            return associationNode.data.parent.indexOf( n.data.guid ) >= 0;
                         })
                     }
                     // child.id = child.text + '_2';
@@ -327,27 +335,8 @@ define([
 
         _getChildrenNodesForParentObject: function(pid, parentlevel) {
             var ret = [];
-            // given a parent ID
-            // var pid = parent.getGuid();
-            // find all associations whose parent or child is this parent ID
-            this._associations.forEach(function(a) {
-                if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0] === pid ||
-                    a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0] === pid) {
-                    ret.push({
-                        text: a.get('CompleteName'),
-                        type: 'assc',
-                        children: true,
-                        data: {
-                            treeparent: pid,
-                            guid: a.getGuid(),
-                            name: a.get('CompleteName'),
-                            parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0],
-                            child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0],
-                            level: parentlevel + 1
-                        }
-                    });
-                }
-            });
+			
+			this._members = this._doSortOnText( this._members);
             this._members.forEach(function(a) {
                 if (a.get("MxModelReflection.MxObjectMember_MxObjectType") === pid) {
                     ret.push({
@@ -362,14 +351,48 @@ define([
                     });
                 }
             });
-            return ret.sort(function(a, b) {
+            
+		    // given a parent ID
+            // var pid = parent.getGuid();
+            // find all associations whose parent or child is this parent ID
+
+			this._associations = this._doSortOnText( this._associations);
+            this._associations.forEach(function(a) {
+                if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent").find(function(n) { return n === pid })  ||
+                    a.get("MxModelReflection.MxObjectReference_MxObjectType_Child").find(function(n) { return n === pid }) ) {
+                    ret.push({
+                        text: a.get('CompleteName'),
+                        type: 'assc',
+                        children: true,
+                        data: {
+                            treeparent: pid,
+                            guid: a.getGuid(),
+                            name: a.get('CompleteName'),
+                            parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent").join('|'),
+                            child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child").join('|'),
+                            level: parentlevel + 1
+                        }
+                    });
+                }
+            });
+			
+			return ret;
+			/*return ret.sort(function(a, b) {
                 if (a.text < b.text) return -1;
                 else if (a.text > b.text) return 1;
                 return 0;
-            });
+            });*/
             // .get("MxModelReflection.MxObjectReference_MxObjectType_Parent")
             // .get("MxModelReflection.MxObjectReference_MxObjectType_Child")
         },
+		
+		_doSortOnText: function( array ) {
+			return array.sort(function(a, b) {
+					if (a.text < b.text) return -1;
+					else if (a.text > b.text) return 1;
+					return 0;
+				});
+		},
 
         _renderCheckboxes: function() {
             var self = this;
@@ -399,7 +422,7 @@ define([
                 checkbox: {
                     keep_selected_style: false,
                     three_state: false,
-                    cascade: 'down'
+                    cascade: ''
                 },
                 contextmenu: {
                     items: function(node) {
@@ -407,12 +430,19 @@ define([
                             return null
                         else {
                             return {
-                                useaskey: {
+                                "useaskey": {
                                     label: 'Use as key',
                                     action: function(e) {
                                         //somehow show that this node is a key
-                                        node.data.isKey = true;
-                                        node.text += " 🔑";
+                                        if( node.data.isKey !== true ) {
+											node.data.isKey = true;
+											node.data.oriText = node.text;
+											$('.mxreflectionselector').jstree('rename_node', node , node.text + " 🔑");
+										}
+										else {
+											node.data.isKey = false;
+											$('.mxreflectionselector').jstree('rename_node', node , node.data.oriText);
+										}
                                     }
                                 }
                             };
@@ -449,6 +479,32 @@ define([
 
                 }
             });
+			
+			    // Selection Actions
+    $('.mxreflectionselector').on("select_node.jstree", function (e, data) {
+		if( !this.cascade )
+			this.cascade = 0;
+
+        var parentNode = data.node.parent;
+		if( parentNode !== "#") {
+			this.cascade++;
+			$('.mxreflectionselector').jstree('select_node', parentNode);
+			this.cascade--;
+		}
+		
+		if( this.cascade <= 0 ) {
+			var children = data.node.children;
+			this.cascade--;
+			$('.mxreflectionselector').jstree('select_node', children);
+			this.cascade++;
+		}
+    });
+
+    // Deselection Actions
+    $('.mxreflectionselector').on("deselect_node.jstree", function (e, data) {
+		var children = data.node.children;
+        $('.mxreflectionselector').jstree('deselect_node', children);
+    });
         },
 
         __getChildren2: function(node) {
@@ -471,29 +527,32 @@ define([
         __getAssociationChildren: function(pid, cid, treeparent, parentlevel) {
             var retObject;
             // if the treeparent is the parent
-            if (pid == treeparent) {
+            if (pid.indexOf(treeparent) >= 0 ) {
                 // get the child
-                retObject = this._entities.find(function(n) {
-                    return n.getGuid() === cid
+                retObject = this._entities.filter(function(n) {
+                    return cid.indexOf( n.getGuid() ) >= 0
                 })
             }
             // else get the parent
             else {
-                retObject = this._entities.find(function(n) {
-                    return n.getGuid() === pid
+                retObject = this._entities.filter(function(n) {
+                    return pid.indexOf( n.getGuid() ) >= 0 
                 })
             }
-            return [{
-                text: retObject.get('CompleteName'),
-                type: 'obj',
-                // query to grab the attributes
-                children: true,
-                data: {
-                    guid: retObject.getGuid(),
-                    name: retObject.get('CompleteName'),
-                    level: parentlevel + 1
-                }
-            }];
+			
+            return retObject.map( function(o) { 
+				return {
+								text: o.get('CompleteName'),
+								type: 'obj',
+								// query to grab the attributes
+								children: true,
+								data: {
+									guid: o.getGuid(),
+									name: o.get('CompleteName'),
+									level: parentlevel + 1
+								}
+							};
+			});
         },
 
         _updateRendering: function(callback) {

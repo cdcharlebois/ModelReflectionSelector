@@ -19,5 +19,11 @@
                 <attributeType name="String" />
             </attributeTypes>
         </property>
+		<property key="clickMicroflow" type="microflow" required="false">
+          <caption>After generate microflow</caption>
+          <category>General</category>
+          <description>The microflow that will be executed after the JSON has been generated when clicking the Go! button.</description>
+          <returnType type="Void"/>
+      </property>
     </properties>
 </widget>
