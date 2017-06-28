@@ -412,12 +412,19 @@ define([
                             return null
                         else {
                             return {
-                                useaskey: {
+                                "useaskey": {
                                     label: 'Use as key',
                                     action: function(e) {
                                         //somehow show that this node is a key
-                                        node.data.isKey = true;
-                                        node.text += " 🔑";
+                                        if( node.data.isKey !== true ) {
+											node.data.isKey = true;
+											node.data.oriText = node.text;
+											$('.mxreflectionselector').jstree('rename_node', node , node.text + " 🔑");
+										}
+										else {
+											node.data.isKey = false;
+											$('.mxreflectionselector').jstree('rename_node', node , node.data.oriText);
+										}
                                     }
                                 }
                             };
