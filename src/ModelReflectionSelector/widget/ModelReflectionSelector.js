@@ -190,18 +190,36 @@ define([
             if (thisnode.type === 'obj') {
                 // objecttype
                 ret.objectType = thisnode.data.name;
+
+                // Keys
+                var myKeys = selected.filter(function(node) {
+                    return node.parent === thisnode.id && node.type == 'attr' && node.data.isKey === true
+                });
+				if( myKeys.length > 0 ) {
+					ret.keys = {};
+					myKeys.forEach(function(member) {
+						ret.keys[member.data.name.split(' / ')[1]] = true;
+					});
+				}
+
                 // members
-                ret.members = {}
                 var myMembers = selected.filter(function(node) {
-                    return node.parent === thisnode.id && node.type !== 'assc'
+                    return node.parent === thisnode.id && node.type !== 'assc' //&& node.data.isKey !== true
                 });
-                myMembers.forEach(function(member) {
-                    ret.members[member.data.name.split(' / ')[1]] = true;
-                });
+				if( myMembers.length > 0 ) {
+					ret.members = {};
+					myMembers.forEach(function(member) {
+						ret.members[member.data.name.split(' / ')[1]] = true;
+					});
+				}
+				
                 // associations
                 var myAssociations = selected.filter(function(node) {
                     return node.parent === thisnode.id && node.type === 'assc'
                 });
+				// Only reset the .members if we have associations, and if members hasn't been created previously
+				if( ret.members == null && myAssociations.length > 0 )
+					ret.members = {};
                 myAssociations.forEach(function(association) {
                     ret.members[association.data.name] = self.__buildOutput(association, selected)
                 });
