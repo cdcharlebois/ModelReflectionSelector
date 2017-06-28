@@ -311,12 +311,12 @@ define([
                     if (node.data.guid === associationNode.data.parent) {
                         // add the child node
                         child = data.find(function(n) {
-                            return n.data.guid === associationNode.data.child;
+                            return associationNode.data.child.indexOf( n.data.guid ) >= 0;
                         })
                     } else {
                         // add the parent node
                         child = data.find(function(n) {
-                            return n.data.guid === associationNode.data.parent;
+                            return associationNode.data.parent.indexOf( n.data.guid ) >= 0;
                         })
                     }
                     // child.id = child.text + '_2';
@@ -358,8 +358,8 @@ define([
 
 			this._associations = this._doSortOnText( this._associations);
             this._associations.forEach(function(a) {
-                if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0] === pid ||
-                    a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0] === pid) {
+                if (a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent").find(function(n) { return n === pid })  ||
+                    a.get("MxModelReflection.MxObjectReference_MxObjectType_Child").find(function(n) { return n === pid }) ) {
                     ret.push({
                         text: a.get('CompleteName'),
                         type: 'assc',
@@ -368,8 +368,8 @@ define([
                             treeparent: pid,
                             guid: a.getGuid(),
                             name: a.get('CompleteName'),
-                            parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent")[0],
-                            child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child")[0],
+                            parent: a.get("MxModelReflection.MxObjectReference_MxObjectType_Parent").join('|'),
+                            child: a.get("MxModelReflection.MxObjectReference_MxObjectType_Child").join('|'),
                             level: parentlevel + 1
                         }
                     });
@@ -422,7 +422,7 @@ define([
                 checkbox: {
                     keep_selected_style: false,
                     three_state: false,
-                    cascade: 'down'
+                    cascade: ''
                 },
                 contextmenu: {
                     items: function(node) {
@@ -479,6 +479,32 @@ define([
 
                 }
             });
+			
+			    // Selection Actions
+    $('.mxreflectionselector').on("select_node.jstree", function (e, data) {
+		if( !this.cascade )
+			this.cascade = 0;
+
+        var parentNode = data.node.parent;
+		if( parentNode !== "#") {
+			this.cascade++;
+			$('.mxreflectionselector').jstree('select_node', parentNode);
+			this.cascade--;
+		}
+		
+		if( this.cascade <= 0 ) {
+			var children = data.node.children;
+			this.cascade--;
+			$('.mxreflectionselector').jstree('select_node', children);
+			this.cascade++;
+		}
+    });
+
+    // Deselection Actions
+    $('.mxreflectionselector').on("deselect_node.jstree", function (e, data) {
+		var children = data.node.children;
+        $('.mxreflectionselector').jstree('deselect_node', children);
+    });
         },
 
         __getChildren2: function(node) {
@@ -501,29 +527,32 @@ define([
         __getAssociationChildren: function(pid, cid, treeparent, parentlevel) {
             var retObject;
             // if the treeparent is the parent
-            if (pid == treeparent) {
+            if (pid.indexOf(treeparent) >= 0 ) {
                 // get the child
-                retObject = this._entities.find(function(n) {
-                    return n.getGuid() === cid
+                retObject = this._entities.filter(function(n) {
+                    return cid.indexOf( n.getGuid() ) >= 0
                 })
             }
             // else get the parent
             else {
-                retObject = this._entities.find(function(n) {
-                    return n.getGuid() === pid
+                retObject = this._entities.filter(function(n) {
+                    return pid.indexOf( n.getGuid() ) >= 0 
                 })
             }
-            return [{
-                text: retObject.get('CompleteName'),
-                type: 'obj',
-                // query to grab the attributes
-                children: true,
-                data: {
-                    guid: retObject.getGuid(),
-                    name: retObject.get('CompleteName'),
-                    level: parentlevel + 1
-                }
-            }];
+			
+            return retObject.map( function(o) { 
+				return {
+								text: o.get('CompleteName'),
+								type: 'obj',
+								// query to grab the attributes
+								children: true,
+								data: {
+									guid: o.getGuid(),
+									name: o.get('CompleteName'),
+									level: parentlevel + 1
+								}
+							};
+			});
         },
 
         _updateRendering: function(callback) {
